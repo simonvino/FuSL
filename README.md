@@ -27,7 +27,7 @@ Demo jupyter notebooks you can run **locally** after installing the requirements
 
 > [FuSL_demo_surf.ipynb](FuSL_demo_surf.ipynb)
 
-> [FuSL_demo_surf.ipynb](FuSL_demo_vol.ipynb)
+> [FuSL_demo_vol.ipynb](FuSL_demo_vol.ipynb)
 
 
 ## Requirements
