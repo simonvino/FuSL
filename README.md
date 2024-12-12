@@ -2,7 +2,13 @@
 
 <img src="figures/workflow_github.png" width="700">
 
-Fusion searchlight (FuSL) is a framework that allows to integrate multiple types of data in a searchlight decoding analysis. (1) Different data sources, related to different metrics or neuroimaging modalties, are combined in a searchight analysis to decode a brain state. (2) Searchlight decoding yields a spatial map of local decoding accuracies that highlights informative regions. (3) In a next step explainable AI can be used to reconstruct the differential impact of each data source on the decoding. 
+Fusion searchlight (FuSL) is a framework that allows to integrate multiple types of data in a searchlight decoding analysis. 
+
+1. Different data sources, related to different metrics or neuroimaging modalties, are combined in a searchight analysis to decode a brain state.
+
+2. Searchlight decoding yields a spatial map of local decoding accuracies that highlight informative brain regions. 
+
+3. In a next step explainable AI ([SHAP](https://github.com/shap/shap)) is used to reconstruct the differential impact of each source on the decoding. 
 
 The framework is based on our recent paper:
 
