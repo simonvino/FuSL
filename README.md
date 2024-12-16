@@ -12,7 +12,7 @@ Fusion searchlight (FuSL) is a framework that allows to integrate multiple types
 
 The framework is based on our recent paper:
 
-> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://www.arxiv.com) (2024).
+> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.48550/arXiv.2412.10161) (2024).
 
 ---
 
@@ -60,5 +60,5 @@ To run FuSL you can either name your files in analogy to the example files in th
 
 If you find our framework useful, please reference our paper:
 
-> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://www.arxiv.com) (2024).
+> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.48550/arXiv.2412.10161) (2024).
 
