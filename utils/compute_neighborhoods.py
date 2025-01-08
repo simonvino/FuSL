@@ -10,13 +10,17 @@ def k_hop_adjacency_fslr(k,
                          adj=hcp.cortical_adjacency
 ): 
     """Compute adjacency matrix inlcuding all neighboors
-    of order k of all vertices in fsLR space.
+    up to order k of all vertices in fsLR space.
     """
-    # Compute adj matrix containing k-hop neighbors.
-    neigh_adj = adj.copy()
-    for order in range(k-1):
-        neigh_adj = neigh_adj.dot(neigh_adj)
-        neigh_adj[neigh_adj != 0] = 1  # Binarize adjacency matrix.
+    # Compute adj matrix containing neighbors up to order k.
+    if k == 0:  # Return identity matrix in case k == 0.
+        neigh_adj = sparse.eye(adj.shape[0], adj.shape[1], format='lil')
+    elif k > 0:
+        neigh_adj = adj.copy()
+        neigh_adj.setdiag(1)
+        for order in range(k-1):
+            neigh_adj = neigh_adj.dot(neigh_adj)
+            neigh_adj[neigh_adj != 0] = 1  # Binarize adjacency matrix.
 
     return sparse.lil_matrix(neigh_adj)
 
