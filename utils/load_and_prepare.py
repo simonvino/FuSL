@@ -16,7 +16,8 @@ def prepare_fusl_data(
     sources, 
     neigh_adj, 
     labels=[1, -1],
-    verbose=True
+    verbose=True,
+    mask=slice(None)
 ):
     """This function prepartes the data in form of numpy array,
     including the labels and adjacency matrix for the searchlight.
@@ -68,12 +69,14 @@ def prepare_fusl_data(
         for group, label in zip(groups, labels):
             grp_df = input_df.loc[input_df['group'].isin([group])]
             grp_np = np.stack(grp_df[source].to_numpy())
+            grp_np = grp_np[:, mask]  # Mask vertices.
             grp_y = [label] * grp_np.shape[0]  # Create labels for each group.
             y.append(grp_y)
             X_metr.append(grp_np)  # Aggregate data for each group.
 
         X.append(np.concatenate(X_metr))
         y = np.concatenate(y)
+        neigh_adj = neigh_adj[mask, mask]  # Mask adjacency matrix.
         neigh_adjs.append(neigh_adj)
 
     # Concatenate features horizontally.
@@ -85,7 +88,7 @@ def prepare_fusl_data(
     neigh_adj_sources = sparse.lil_matrix(neigh_adj_sources)
 
     if verbose:
-       print('X has shape: {}, FuSL adjacency matrix has shape: {}.'.format(X.shape, neigh_adj_sources.shape))
+        print('X has shape: {}, FuSL adjacency matrix has shape: {}.'.format(X.shape, neigh_adj_sources.shape))
 
     return X, y, neigh_adj_sources
     
@@ -157,7 +160,6 @@ def load_fusl_cifti_data(
                 grp_id = get_id(source_file, 'grp')
                 if verbose:
                     print('Load:', source_file)
-                # Modify this part if you want to load nifti data.
                 data_source = nb.load(source_file).get_fdata()
                 data_source = data_source[0, mask]  # Mask data.
                 source_dicts.append({'sub': sub_id,

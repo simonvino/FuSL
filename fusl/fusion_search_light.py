@@ -19,9 +19,8 @@ import numpy as np
 from joblib import Parallel, cpu_count, delayed
 from sklearn import svm
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.model_selection import cross_val_score, permutation_test_score
+from sklearn.model_selection import permutation_test_score
 from nilearn._utils import fill_doc
-from sklearn.metrics import check_scoring
 from sklearn.model_selection import cross_validate
 import shap
 
@@ -41,6 +40,8 @@ def fusion_search_light(
     verbose=0,
     n_permutations=0,
     shap=True,
+    return_preds=None,
+    joblib_pref=None,
 ):
     """Compute a search_light. This function can 
     include permutation testing and compute SHAP values.
@@ -105,7 +106,7 @@ def fusion_search_light(
     group_iter = GroupIterator(A.shape[0], n_jobs)
     with warnings.catch_warnings():  # might not converge
         warnings.simplefilter("ignore", ConvergenceWarning)
-        results = merge_dicts(Parallel(n_jobs=n_jobs, verbose=verbose, prefer="threads")(
+        results = merge_dicts(Parallel(n_jobs=n_jobs, verbose=verbose, prefer=None)(
                                         delayed(_group_iter_search_light)(
                                         A.rows[list_i],
                                         estimator,
@@ -119,6 +120,7 @@ def fusion_search_light(
                                         verbose,
                                         n_permutations,
                                         shap,
+                                        return_preds,
             )
             for thread_id, list_i in enumerate(group_iter)
         )
@@ -164,6 +166,7 @@ def _group_iter_search_light(
     verbose=0,
     n_permutations=0,
     shap=True,
+    return_preds=None,
 ):
     """Perform grouped iterations of search_light.
 
@@ -234,10 +237,34 @@ def _group_iter_search_light(
         results['pvals_uncor'] = np.ones(len(list_rows))  # Uncorrected p-values, computed by sklearn's permutation_test_score.
     if shap is True:
         results['shap_vals'] = []
+    if return_preds is not None:
+        results['preds'] = []
+        # results['test_preds'] = []
+        # results['test_true'] = []
+    if shap is True or return_preds is not None:
+        return_estimator = True
+        return_indices = True
+    else:
+        return_estimator = False
+        return_indices = False
 
     t0 = time.time()
     for i, row in enumerate(list_rows):
         kwargs = {"scoring": scoring, "groups": groups}
+
+        # Compute unpermuted scores of each CV split and return predictions.
+        cv_results = cross_validate(estimator,
+                                    X[:, row],
+                                    y,
+                                    cv=cv,
+                                    n_jobs=1,
+                                    return_train_score=False,
+                                    return_estimator=return_estimator,
+                                    return_indices=return_indices,
+                                    )
+
+        results['scores'][i, :] = cv_results['test_score']
+        results['avg_scores'][i] = np.mean(results['scores'][i, :])
 
         # Do permutation testing.
         if n_permutations > 0:
@@ -247,33 +274,28 @@ def _group_iter_search_light(
                                                                  cv=cv, 
                                                                  n_permutations=n_permutations, 
                                                                  n_jobs=1, 
-                                                                 random_state=42, 
-                                                                 verbose=0, 
+                                                                 random_state=42,  # Apply same permutations in every SL!
                                                                  **kwargs
-                                                                )
+                                                                 )
             results['perm_scores'][i] = perm_scores
             results['pvals_uncor'][i] = pvals_uncor
 
-        # Compute unpermuted scores of each CV split.
-        results['scores'][i, :] = cross_val_score(estimator, 
-                                                  X[:, row], 
-                                                  y, 
-                                                  cv=cv, 
-                                                  n_jobs=1, 
-                                                  **kwargs
-                                                 )
-        results['avg_scores'][i] = np.mean(results['scores'][i, :])
-
         # Compute SHAP values.
         if shap is True:
-            results['shap_vals'].append(cross_val_score_x(estimator, 
-                                                          X[:, row], 
-                                                          y, 
-                                                          cv=cv, 
-                                                          n_jobs=1, 
-                                                          **kwargs
-                                                         )
-                                       )  
+            results['shap_vals'].append(explain_results(cv_results, 
+                                                        X[:, row],
+                                                        method='kernel',
+                                                        ))
+
+        # Collect predictions.
+        if return_preds is not None:
+            test_preds = preds_from_cv_results(cv_results, 
+                                               X[:, row],
+                                               y,
+                                               indices="test",
+                                               pred_type=return_preds,
+                                               )
+            results['preds'].append(test_preds)
 
         if verbose > 0:
             # One can't print less than each 10 iterations
@@ -292,6 +314,26 @@ def _group_iter_search_light(
                 )
 
     return results
+
+
+def preds_from_cv_results(cv_results, X, y, indices="test", pred_type='label'):
+    '''Get predictions from cv_results.
+    '''
+    sel_idxs = cv_results["indices"][indices]
+    preds = {}
+    preds_cv, true_cv, classes_cv = [], [], []
+    for idx, estimator_cv in zip(sel_idxs, cv_results["estimator"]):
+        if pred_type == 'proba':
+            preds_cv.append(estimator_cv.predict_proba(X[idx]))
+            classes_cv.append(estimator_cv.classes_)
+        elif pred_type == 'label':
+            preds_cv.append(estimator_cv.predict(X[idx]))
+        true_cv.append(y[idx])
+    preds.update({'preds': preds_cv, 'true': true_cv})
+    if pred_type == 'proba':
+        preds.update({'classes': classes_cv})
+
+    return preds
 
 
 def merge_dicts(dcts):
@@ -318,142 +360,7 @@ def merge_dicts(dcts):
     return dct_concat
 
 
-def cross_val_score_x(
-    estimator,
-    X,
-    y=None,
-    *,
-    groups=None,
-    scoring=None,
-    cv=None,
-    n_jobs=None,
-    verbose=0,
-    fit_params=None,
-    pre_dispatch="2*n_jobs",
-    error_score=np.nan,
-):
-    """Evaluate a score by cross-validation.
-    Returns SHAP values.
-
-    Read more in the :ref:`User Guide <cross_validation>`.
-
-    Parameters
-    ----------
-    estimator : estimator object implementing 'fit'
-        The object to use to fit the data.
-
-    X : array-like of shape (n_samples, n_features)
-        The data to fit. Can be for example a list, or an array.
-
-    y : array-like of shape (n_samples,) or (n_samples, n_outputs), \
-            default=None
-        The target variable to try to predict in the case of
-        supervised learning.
-
-    groups : array-like of shape (n_samples,), default=None
-        Group labels for the samples used while splitting the dataset into
-        train/test set. Only used in conjunction with a "Group" :term:`cv`
-        instance (e.g., :class:`GroupKFold`).
-
-    scoring : str or callable, default=None
-        A str (see model evaluation documentation) or
-        a scorer callable object / function with signature
-        ``scorer(estimator, X, y)`` which should return only
-        a single value.
-
-        Similar to :func:`cross_validate`
-        but only a single metric is permitted.
-
-        If `None`, the estimator's default scorer (if available) is used.
-
-    cv : int, cross-validation generator or an iterable, default=None
-        Determines the cross-validation splitting strategy.
-        Possible inputs for cv are:
-
-        - `None`, to use the default 5-fold cross validation,
-        - int, to specify the number of folds in a `(Stratified)KFold`,
-        - :term:`CV splitter`,
-        - An iterable that generates (train, test) splits as arrays of indices.
-
-        For `int`/`None` inputs, if the estimator is a classifier and `y` is
-        either binary or multiclass, :class:`StratifiedKFold` is used. In all
-        other cases, :class:`KFold` is used. These splitters are instantiated
-        with `shuffle=False` so the splits will be the same across calls.
-
-        Refer :ref:`User Guide <cross_validation>` for the various
-        cross-validation strategies that can be used here.
-
-        .. versionchanged:: 0.22
-            `cv` default value if `None` changed from 3-fold to 5-fold.
-
-    n_jobs : int, default=None
-        Number of jobs to run in parallel. Training the estimator and computing
-        the score are parallelized over the cross-validation splits.
-        ``None`` means 1 unless in a :obj:`joblib.parallel_backend` context.
-        ``-1`` means using all processors. See :term:`Glossary <n_jobs>`
-        for more details.
-
-    verbose : int, default=0
-        The verbosity level.
-
-    fit_params : dict, default=None
-        Parameters to pass to the fit method of the estimator.
-
-    pre_dispatch : int or str, default='2*n_jobs'
-        Controls the number of jobs that get dispatched during parallel
-        execution. Reducing this number can be useful to avoid an
-        explosion of memory consumption when more jobs get dispatched
-        than CPUs can process. This parameter can be:
-
-            - ``None``, in which case all the jobs are immediately
-              created and spawned. Use this for lightweight and
-              fast-running jobs, to avoid delays due to on-demand
-              spawning of the jobs
-
-            - An int, giving the exact number of total jobs that are
-              spawned
-
-            - A str, giving an expression as a function of n_jobs,
-              as in '2*n_jobs'
-
-    error_score : 'raise' or numeric, default=np.nan
-        Value to assign to the score if an error occurs in estimator fitting.
-        If set to 'raise', the error is raised.
-        If a numeric value is given, FitFailedWarning is raised.
-
-        .. versionadded:: 0.20
-
-    Returns
-    -------
-    shap_results : array like
-        Average absolute SHAP value for each feature.
-    """
-    # To ensure multisource format is not supported
-    scorer = check_scoring(estimator, scoring=scoring)
-
-    cv_results = cross_validate(
-        estimator=estimator,
-        X=X,
-        y=y,
-        groups=groups,
-        scoring={"score": scorer},
-        cv=cv,
-        n_jobs=n_jobs,
-        verbose=verbose,
-        fit_params=fit_params,
-        pre_dispatch=pre_dispatch,
-        error_score=error_score,
-        return_estimator=True,
-        return_indices=True,
-    )
-
-    # Compute SHAP values.
-    shap_results = explain_results(cv_results, X)
-
-    return shap_results
-
-
-def explain_results(cv_results, X, sel_idxs=None):
+def explain_results(cv_results, X, sel_idxs=None, method='permutation'):
     '''Compute SHAP value for each feature.
 
     Parameters
@@ -469,6 +376,9 @@ def explain_results(cv_results, X, sel_idxs=None):
     sel_idxs : slice
         Indices of X for computing SHAP values.
 
+    method : string
+        Method to compute SHAP values.
+
     Returns
     -------
     shap_results : array-like of shape (n_features)
@@ -481,11 +391,18 @@ def explain_results(cv_results, X, sel_idxs=None):
         sel_idxs = cv_results["indices"]["test"]  # Select only test indices to reduce computational load.
     shap_results = []
     for idx, estimator_cv in zip(sel_idxs, cv_results["estimator"]):  # Iterate over CV folds.
-        explainer = shap.explainers.Permutation(estimator_cv.predict, 
-                                                X[idx],
-                                                max_evals=N_feat*2+1)  # Use model agnostic Permutation explainer.
-        shap_values_cv = explainer(X[idx])
-        shap_results.append(shap_values_cv.values)
+        if method == 'permutation':
+            explainer = shap.PermutationExplainer(estimator_cv.predict,
+                                                    X[idx],
+                                                    max_evals=N_feat*2+1,
+                                                    seed=42,
+                                                    silent=True)
+        elif method == 'kernel':
+            explainer = shap.KernelExplainer(estimator_cv.predict,
+                                             X[idx],
+                                             silent=True)
+        shap_values_cv = explainer.shap_values(X[idx])
+        shap_results.append(shap_values_cv)
 
     shap_results = np.concatenate(shap_results)  # Concatenate all CV folds.
     shap_results = np.mean(np.abs(shap_results), axis=0)  # Average over all samples and folds.
