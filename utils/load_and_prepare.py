@@ -161,7 +161,7 @@ def load_fusl_cifti_data(
                 if verbose:
                     print('Load:', source_file)
                 data_source = nb.load(source_file).get_fdata()
-                data_source = data_source[0, mask]  # Mask data.
+                data_source = data_source[:, mask]  # Mask data.
                 source_dicts.append({'sub': sub_id,
                                      'group': grp_id,
                                      source: data_source})

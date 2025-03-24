@@ -239,8 +239,6 @@ def _group_iter_search_light(
         results['shap_vals'] = []
     if return_preds is not None:
         results['preds'] = []
-        # results['test_preds'] = []
-        # results['test_true'] = []
     if shap is True or return_preds is not None:
         return_estimator = True
         return_indices = True
@@ -261,6 +259,7 @@ def _group_iter_search_light(
                                     return_train_score=False,
                                     return_estimator=return_estimator,
                                     return_indices=return_indices,
+                                    **kwargs
                                     )
 
         results['scores'][i, :] = cv_results['test_score']
@@ -393,10 +392,10 @@ def explain_results(cv_results, X, sel_idxs=None, method='permutation'):
     for idx, estimator_cv in zip(sel_idxs, cv_results["estimator"]):  # Iterate over CV folds.
         if method == 'permutation':
             explainer = shap.PermutationExplainer(estimator_cv.predict,
-                                                    X[idx],
-                                                    max_evals=N_feat*2+1,
-                                                    seed=42,
-                                                    silent=True)
+                                                  X[idx],
+                                                  max_evals=N_feat*2+1,
+                                                  seed=42,
+                                                  silent=True)
         elif method == 'kernel':
             explainer = shap.KernelExplainer(estimator_cv.predict,
                                              X[idx],
