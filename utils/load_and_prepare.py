@@ -12,7 +12,7 @@ from .compute_neighborhoods import k_hop_adjacency_fslr, radial_adjacency_fslr, 
 
 def prepare_fusl_data(
     input_df, 
-    groups, 
+    classes, 
     sources, 
     neigh_adj, 
     labels=[1, -1],
@@ -28,8 +28,8 @@ def prepare_fusl_data(
     input_df : pandas dataframe
         dataframe with subjects in rows and sources in columns.
 
-    groups : list of strings
-        names of groups.
+    classes : list of strings
+        names of classes.
 
     sources : list of strings
         names of sources used in the multi-modal searchlight.
@@ -39,7 +39,7 @@ def prepare_fusl_data(
         following a given structure of the data.
 
     labels : list of floats
-        labels of the groups, used in the serachlight. Default is [1, -1]
+        labels of the classes, used in the serachlight. Default is [1, -1]
 
     verbose : boolean
         The verbosity level. Default is True
@@ -66,13 +66,13 @@ def prepare_fusl_data(
     X, neigh_adjs = [], []
     for source in sources:
         X_metr, y = [], []
-        for group, label in zip(groups, labels):
-            grp_df = input_df.loc[input_df['group'].isin([group])]
+        for class_, label in zip(classes, labels):
+            grp_df = input_df.loc[input_df['class'].isin([class_])]
             grp_np = np.stack(grp_df[source].to_numpy())
             grp_np = grp_np[:, mask]  # Mask vertices.
-            grp_y = [label] * grp_np.shape[0]  # Create labels for each group.
+            grp_y = [label] * grp_np.shape[0]  # Create labels for each class.
             y.append(grp_y)
-            X_metr.append(grp_np)  # Aggregate data for each group.
+            X_metr.append(grp_np)  # Aggregate data for each class.
 
         X.append(np.concatenate(X_metr))
         y = np.concatenate(y)
@@ -95,7 +95,7 @@ def prepare_fusl_data(
 
 def load_fusl_cifti_data(
     data_dir, 
-    groups, 
+    classes, 
     sources, 
     mask=slice(None),
     radius=3,
@@ -104,9 +104,9 @@ def load_fusl_cifti_data(
 ):
     """This function loads your cifti data and stores it in
     a pandas dataframe. It additionally computes the neighborhood ajacency matrix.
-    This function assumes data of each group is stored in a separate directory:
-    /data_dir/group_dir/source_files
-    For instance for group 1, subject 1, source 1:
+    This function assumes data of each class is stored in a separate directory:
+    /data_dir/class_dir/source_files
+    For instance for class 1, subject 1, source 1:
     /my_artificial_data/StN-1.0_ampstd-1_nsub-30_fullovlp/grp-1/source-1_sub-01_ses-1_grp-1.dtseries.nii
 
     Parameters
@@ -114,8 +114,8 @@ def load_fusl_cifti_data(
     data_dir : string
         path to data directory.
 
-    groups : list of strings
-        names of groups.
+    classes : list of strings
+        names of classes.
 
     sources : list of strings
         names of sources used in the analysis.
@@ -146,34 +146,34 @@ def load_fusl_cifti_data(
     # Create separate dataframe for each source.
     for source in sources:
         source_dicts = []
-        # Iterate over groups.
-        for group in groups:
-            # Find all source files of specific group and source.
+        # Iterate over classes.
+        for class_ in classes:
+            # Find all source files of specific class and source.
             source_files = glob.glob('{}/{}/{}_*'.format(data_dir, 
-                                                         group, 
+                                                         class_, 
                                                          source))
             source_files.sort()
 
             # Load data and save in dictionaries.
             for source_file in source_files:
                 sub_id = get_id(source_file, 'sub')
-                grp_id = get_id(source_file, 'grp')
+                grp_id = get_id(source_file, 'class')
                 if verbose:
                     print('Load:', source_file)
-                data_source = nb.load(source_file).get_fdata()
-                data_source = data_source[:, mask]  # Mask data.
+                data_source = nb.load(source_file).get_fdata().squeeze()
+                data_source = data_source[mask]  # Mask data.
                 source_dicts.append({'sub': sub_id,
-                                     'group': grp_id,
+                                     'class': grp_id,
                                      source: data_source})
         input_dfs.append(pd.DataFrame(source_dicts))
 
     # Concatenate dataframes.
-    input_df = reduce(lambda x, y: pd.merge(x, y, on=['sub', 'group']), 
+    input_df = reduce(lambda x, y: pd.merge(x, y, on=['sub', 'class']), 
                       input_dfs)
 
     # Compute adjacency matrix.
     if world_space is True:
-        radial_adjacency_fslr(radius)
+        neigh_adj = radial_adjacency_fslr(radius)
     else:
         neigh_adj = k_hop_adjacency_fslr(k=radius)
         
@@ -184,7 +184,7 @@ def load_fusl_cifti_data(
 
 def load_fusl_nifti_data(
     data_dir, 
-    groups, 
+    classes, 
     sources, 
     mask=None,
     radius=3,
@@ -193,9 +193,9 @@ def load_fusl_nifti_data(
 ):
     """This function loads your nifti data and stores it in
     a pandas dataframe. It additionally computes the neighborhood ajacency matrix.
-    This function assumes data of each group is stored in a separate directory:
-    /data_dir/group_dir/source_files
-    For instance for group 1, subject 1, source 1:
+    This function assumes data of each class is stored in a separate directory:
+    /data_dir/class_dir/source_files
+    For instance for class 1, subject 1, source 1:
     /my_artificial_data/StN-1.0_ampstd-1_nsub-30_fullovlp/grp-1/source-1_sub-01_ses-1_grp-1.dtseries.nii
 
     Parameters
@@ -203,8 +203,8 @@ def load_fusl_nifti_data(
     data_dir : string
         path to data directory.
 
-    groups : list of strings
-        names of groups.
+    classes : list of strings
+        names of classes.
 
     sources : list of strings
         names of sources used in the analysis.
@@ -239,18 +239,18 @@ def load_fusl_nifti_data(
     # Create separate dataframe for each source.
     for source in sources:
         source_dicts = []
-        # Iterate over groups.
-        for group in groups:
-            # Find all source files of specific group and source.
+        # Iterate over classes.
+        for class_ in classes:
+            # Find all source files of specific class and source.
             source_files = glob.glob('{}/{}/{}_*'.format(data_dir, 
-                                                         group, 
+                                                         class_, 
                                                          source))
             source_files.sort()
 
             # Load data and save in dictionaries.
             for source_file in source_files:
                 sub_id = get_id(source_file, 'sub')
-                grp_id = get_id(source_file, 'grp')
+                grp_id = get_id(source_file, 'class')
                 if verbose:
                     print('Load:', source_file)
                 # Modify this part if you want to load nifti data.
@@ -265,12 +265,12 @@ def load_fusl_nifti_data(
         
                 data_source = masking.apply_mask_fmri(source_nii, mask)
                 source_dicts.append({'sub': sub_id,
-                                     'group': grp_id,
+                                     'class': grp_id,
                                      source: data_source})
         input_dfs.append(pd.DataFrame(source_dicts))
 
     # Concatenate dataframes.
-    input_df = reduce(lambda x, y: pd.merge(x, y, on=['sub', 'group']), 
+    input_df = reduce(lambda x, y: pd.merge(x, y, on=['sub', 'class']), 
                       input_dfs)
 
     # Compute adjacency matrix.
