@@ -12,7 +12,7 @@ Fusion searchlight (FuSL) is a framework that allows to integrate multiple types
 
 The framework is based on our recent paper:
 
-> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.48550/arXiv.2412.10161) (2024).
+> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.1016/j.neuroimage.2025.121263) (2024).
 
 ---
 
@@ -60,5 +60,20 @@ To run FuSL you can either name your files in analogy to the example files in th
 
 If you find our framework useful, please reference our paper:
 
-> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.48550/arXiv.2412.10161) (2024).
+> Wein, S., Riebl, M., Brunner, L., Nothdurfter, C., Rupprecht, R., Schwarzbach, J.: [Data Integration with Fusion Searchlight: Classifying Brain States from Resting-state fMRI](https://doi.org/10.1016/j.neuroimage.2025.121263). NeuroImage, 315 (2025).
+
+Or with BibTeX:
+
+```
+@article{Wein2025,
+title = {Data integration with Fusion Searchlight: Classifying brain states from resting-state fMRI},
+journal = {NeuroImage},
+volume = {315},
+pages = {121263},
+year = {2025},
+issn = {1053-8119},
+doi = {https://doi.org/10.1016/j.neuroimage.2025.121263},
+author = {Simon Wein and Marco Riebel and Lisa-Marie Brunner and Caroline Nothdurfter and Rainer Rupprecht and Jens V. Schwarzbach},
+}
+```
 

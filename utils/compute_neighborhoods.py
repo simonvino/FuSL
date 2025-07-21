@@ -44,7 +44,7 @@ def radial_adjacency_fslr(radius,
 
     # Add subcortical voxels. 
     if add_subcortical is True:
-        coords_sub = np.load('./own_data/fsLR_coords_subcortical.npy')
+        coords_sub = sparse.load_npz('./data_utils/fsLR_coords_subcortical.npz')
         coords = np.concatenate([coords, coords_sub])
 
     # Get neighborhoods.
